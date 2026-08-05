@@ -17,6 +17,10 @@ public class InputFieldException extends RuntimeException {
     private final Map<String, String> errorsMap;
     private BindingResult bindingResult;
 
+    /**
+     *
+     * @param bindingResult
+     */
     public InputFieldException(BindingResult bindingResult) {
         super("Input validation failed");
         this.status = HttpStatus.BAD_REQUEST;
@@ -24,12 +28,22 @@ public class InputFieldException extends RuntimeException {
         this.bindingResult = bindingResult;
     }
 
+    /**
+     *
+     * @param status
+     * @param message
+     */
     public InputFieldException(HttpStatus status, String message) {
         super(message);
         this.status = status;
         this.errorsMap = null;
     }
 
+    /**
+     *
+     * @param bindingResult
+     * @return
+     */
     private Map<String, String> handleErrors(BindingResult bindingResult) {
         Map<String, String> errors = new HashMap<>();
         bindingResult.getFieldErrors().forEach(fieldError -> errors.put(fieldError.getField(), fieldError.getDefaultMessage()));

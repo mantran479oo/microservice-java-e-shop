@@ -2,6 +2,7 @@ package org.example.userservice.controller.api;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.commonsservice.constants.PathConstants;
 import org.example.commonsservice.exception.ApiResponse;
 import org.example.commonsservice.exception.ResponseUtil;
 import org.example.userservice.dto.request.AuthenticationRequest;
@@ -18,12 +19,12 @@ import java.util.Map;
 
 @Controller
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/")
+@RequestMapping(PathConstants.API_V1)
 public class LoginController {
 
     private final CustomerService customerService;
 
-    @PostMapping("/token")
+    @PostMapping(PathConstants.TOKEN)
     public ResponseEntity<ApiResponse<AuthenticationResponse>> login(@Valid @RequestBody AuthenticationRequest request, BindingResult bindingResult){
         Map<String, String> authen = customerService.login(request, bindingResult);
         AuthenticationResponse authenticationResponse = AuthenticationResponse.builder()

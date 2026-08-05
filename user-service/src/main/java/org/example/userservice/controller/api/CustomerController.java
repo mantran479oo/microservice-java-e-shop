@@ -2,6 +2,7 @@ package org.example.userservice.controller.api;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.commonsservice.constants.PathConstants;
 import org.example.commonsservice.exception.ApiResponse;
 import org.example.commonsservice.exception.ResponseUtil;
 import org.example.userservice.dto.request.AuthenticationRequest;
@@ -20,12 +21,12 @@ import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/customers")
+@RequestMapping(PathConstants.CUSTOMER)
 public class CustomerController {
 
     private final CustomerService customerService;
 
-    @PostMapping("/registration")
+    @PostMapping(PathConstants.REGISTRATION)
     public ResponseEntity<ApiResponse<UserResponse>> registration(@Valid @RequestBody RegistrationRequestDTO request, BindingResult bindingResult){
         UserResponse customerRep = customerService.registration(request, bindingResult);
         return ResponseUtil.success(customerRep, "success");

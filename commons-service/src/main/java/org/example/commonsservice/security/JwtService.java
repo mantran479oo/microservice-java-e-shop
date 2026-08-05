@@ -29,6 +29,20 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private Long expiration;
 
+    @Value("${jwt.re_expiration}")
+    private Long rf_expiration;
+
+    /**
+     *
+     * @param userId
+     * @param username
+     * @param role
+     * @return
+     */
+    public String generateRefreshToken(Long userId, String username, String role) {
+        return buildToken(userId, username, role, rf_expiration);
+    }
+
     /**
      *
      * @param userId
@@ -37,8 +51,20 @@ public class JwtService {
      * @return
      */
     public String generateToken(Long userId, String username, String role) {
+        return buildToken(userId, username, role, expiration);
+    }
+
+    /**
+     *
+     * @param userId
+     * @param username
+     * @param role
+     * @param expirationMs
+     * @return String
+     */
+    public String buildToken(Long userId, String username, String role, Long expirationMs) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + jwtProperties.getExpiration());
+        Date expiry = new Date(now.getTime() + expirationMs);
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .issuer(jwtProperties.getIssuer())
@@ -75,6 +101,10 @@ public class JwtService {
                 .parseSignedClaims(token);
     }
 
+    /**
+     *
+     * @return
+     */
     private Key getSignKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);

@@ -30,6 +30,12 @@ public class CustomerServiceImpl implements CustomerService {
     private final CustomerMapper customerMapper;
     private final AuthConfiguration authConfiguration;
 
+    /**
+     *
+     * @param request
+     * @param bindingResult
+     * @return
+     */
     @Transactional
     @Override
     public UserResponse registration(RegistrationRequestDTO request, BindingResult bindingResult){
@@ -42,6 +48,12 @@ public class CustomerServiceImpl implements CustomerService {
         return customerMapper.toResponse(customerRepository.save(user));
     }
 
+    /**
+     *
+     * @param request
+     * @param bindingResult
+     * @return
+     */
     @Override
     public Map<String, String> login(AuthenticationRequest request, BindingResult bindingResult){
         helperData.processInputErrors(bindingResult);
@@ -52,9 +64,10 @@ public class CustomerServiceImpl implements CustomerService {
             throw new InputFieldException(HttpStatus.NOT_FOUND, "Password not correct");
         }
         String token = jwtService.generateToken(customer.getId(), customer.getEmail(),  customer.getRole().name());
+        String refreshToken = jwtService.generateRefreshToken(customer.getId(), customer.getEmail(),  customer.getRole().name());
         return Map.of(
                 "token", token,
-                "refresh_token", "asdasdsadas"
+                "refresh_token", refreshToken
         );
     }
 }

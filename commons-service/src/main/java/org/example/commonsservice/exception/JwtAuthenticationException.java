@@ -6,9 +6,20 @@ public class JwtAuthenticationException extends RuntimeException {
 
     private HttpStatus httpStatus;
 
+    /**
+     *
+     * @param msg
+     */
     public JwtAuthenticationException(String msg) {
         super(msg);
     }
+
+
+    /**
+     *
+     * @param msg
+     * @param httpStatus
+     */
     public JwtAuthenticationException(String msg, HttpStatus httpStatus) {
         super(msg);
         this.httpStatus = httpStatus;
