@@ -1,40 +1,38 @@
+x-java-build: &java-build
+  context: .
+  dockerfile: Dockerfile
+
 services:
-  # ==========================
-  # MySQL
-  # ==========================
   mysql-db:
     image: mysql:8.0
-    container_name: local-mysql
-    restart: always
+    restart: unless-stopped
     environment:
-      MYSQL_DATABASE: demo
-      MYSQL_ROOT_PASSWORD: root
-    ports:
-      - "3306:3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is required}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is required}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
-      - spring
+      - backend
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysql --protocol=TCP -h localhost -u\"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\" \"$$MYSQL_DATABASE\" --silent --skip-column-names -e 'SELECT 1' >/dev/null"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
 
-  config-server:
-    build:
-      context: ./config-server
-      dockerfile: Dockerfile
-    container_name: config-server
-    hostname: config-server
-    environment:
-      EUREKA_HOST: eureka-server
-    networks:
-      - spring
-  # ==========================
-  # phpMyAdmin
-  # ==========================
   phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: phpmyadmin
-    restart: always
+    image: phpmyadmin/phpmyadmin:5.2
+    profiles: ["tools"]
+    restart: unless-stopped
     depends_on:
-      - mysql-db
+      mysql-db:
+        condition: service_healthy
     environment:
       PMA_HOST: mysql-db
       PMA_PORT: 3306
@@ -42,127 +40,179 @@ services:
     ports:
       - "8081:80"
     networks:
-      - spring
+      - edge
+      - backend
 
-  # ==========================
-  # Zookeeper
-  # ==========================
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.0.1
-    container_name: zookeeper
-    restart: always
-    ports:
-      - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+  config-server:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: config-server
+    restart: unless-stopped
     networks:
-      - spring
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
 
-  # ==========================
-  # Kafka
-  # ==========================
-  broker:
-    image: confluentinc/cp-kafka:7.0.1
-    container_name: broker
-    restart: always
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://broker:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
-
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-    networks:
-      - spring
-
-  # ==========================
-  # Eureka Server
-  # ==========================
   eureka-server:
     build:
-      context: ./eureka-server
-    image: eureka-server
-    container_name: eureka-server
-    hostname: eureka-server
-    depends_on:
-      config-server:
-        condition: service_started
-    ports:
-      - "8761:8761"
+      <<: *java-build
+      args:
+        SERVICE: eureka-server
+    restart: unless-stopped
     environment:
       EUREKA_HOST: eureka-server
-      CONFIG_SERVER_HOST: config-server
     networks:
-      - spring
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
 
-  # ==========================
-  # User Service
-  # ==========================
   user-service:
     build:
-      context: ./user-service
-    image: user-service
-    container_name: user-service
-    hostname: user-service
-    restart: always
+      <<: *java-build
+      args:
+        SERVICE: user-service
+    restart: unless-stopped
     depends_on:
       mysql-db:
-        condition: service_started
-      eureka-server:
-        condition: service_started
-      broker:
-        condition: service_started
+        condition: service_healthy
       config-server:
-        condition: service_started
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
     environment:
-      DATASOURCE_HOST: mysql-db
       CONFIG_SERVER_HOST: config-server
+      DATASOURCE_HOST: mysql-db
       DATASOURCE_PORT: 3306
-      DATASOURCE_USERNAME: root
-      DATASOURCE_PASSWORD: root
-      EUREKA_HOST: eureka-server
-      KAFKA_BOOTSTRAP_SERVERS: broker:29092
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_BOOT_CONTEXT_CONFIG: DEBUG
+      DATASOURCE_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is required}
+      DATASOURCE_USERNAME: ${MYSQL_USER:?MYSQL_USER is required}
+      DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
+      EUREKA_URL: http://eureka-server:8761/eureka/
     networks:
-      - spring
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
 
-  # ==========================
-  # API Gateway
-  # ==========================
+  product-service:
+    build:
+      <<: *java-build
+      args:
+        SERVICE: product-service
+    restart: unless-stopped
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      CONFIG_SERVER_HOST: config-server
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
+      EUREKA_URL: http://eureka-server:8761/eureka/
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
   api-gateway:
     build:
-      context: ./api-gateway
-    image: api-gateway
-    container_name: api-gateway
-    hostname: api-gateway
-    restart: always
+      <<: *java-build
+      args:
+        SERVICE: api-gateway
+    restart: unless-stopped
     depends_on:
-      eureka-server:
-        condition: service_started
       config-server:
-        condition: service_started
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
     environment:
-      JAVA_TOOL_OPTIONS: "-Deureka.client.serviceUrl.defaultZone=http://eureka-server:8761/eureka/"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://eureka-server:8761/eureka/"
-      SPRING_CONFIG_IMPORT: "configserver:http://config-server:8888"
+      CONFIG_SERVER_HOST: config-server
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8888
+      EUREKA_URL: http://eureka-server:8761/eureka/
     ports:
       - "8080:8080"
     networks:
-      - spring
+      - edge
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    profiles: ["messaging"]
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "cub zk-ready localhost 2181 10"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  broker:
+    image: confluentinc/cp-kafka:7.0.1
+    profiles: ["messaging"]
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:29092 1 20"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
 
 networks:
-  spring:
-    driver: bridge
+  edge:
+  backend:
+    internal: true
 
 volumes:
   mysql_data:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:

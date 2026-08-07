@@ -1,0 +1,15 @@
+server:
+  port: 8085
+spring:
+  application:
+    name: product-service
+  config:
+    import: optional:configserver:http://${CONFIG_SERVER_HOST:localhost}:8888
+jwt:
+  enabled: false
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true

@@ -5,3 +5,7 @@ spring:
     import: optional:configserver:http://${CONFIG_SERVER_HOST:localhost}:8888
 jwt:
   enabled: true
+  secret: ${JWT_SECRET}
+  issuer: project-javajava
+  access-token-expiration: 15m
+  refresh-token-expiration: 7d

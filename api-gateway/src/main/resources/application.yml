@@ -7,8 +7,12 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true
+          enabled: false
           lower-case-service-id: true
-
   config:
-    import: "optional:configserver:http://config-server:8888"
+    import: "optional:configserver:http://${CONFIG_SERVER_HOST:localhost}:8888"
+
+jwt:
+  enabled: true
+  secret: ${JWT_SECRET}
+  issuer: project-javajava

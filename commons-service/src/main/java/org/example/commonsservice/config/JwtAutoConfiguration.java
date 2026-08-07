@@ -15,7 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
         prefix = "jwt",
         name = "enabled",
         havingValue = "true",
-        matchIfMissing = true
+        matchIfMissing = false
 )
 @EnableConfigurationProperties(JwtProperties.class)
 public class JwtAutoConfiguration {

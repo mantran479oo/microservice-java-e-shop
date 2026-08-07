@@ -13,8 +13,6 @@ import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFac
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
-
 @Component
 public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFactory<AuthenticationGatewayFilterFactory.Config> {
     private static final Logger log = LoggerFactory.getLogger(AuthenticationGatewayFilterFactory.class);
@@ -23,39 +21,36 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
     public AuthenticationGatewayFilterFactory(JwtService jwtService) {
         super(Config.class);
         this.jwtService = jwtService;
-        log.info("===================----------------------------------");
     }
 
     @Override
     public GatewayFilter apply(Config config) {
-        log.info("=============12321321312======----------------------------------");
         return ((exchange, chain) -> {
-            List<String> authHeader = exchange.getRequest().getHeaders().get(HttpHeaders.AUTHORIZATION);
-            if (authHeader == null || authHeader.isEmpty()) {
-                return this.onError(exchange, "Empty Authorization Header", HttpStatus.UNAUTHORIZED);
+            String authorization = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            if (authorization == null || !authorization.startsWith("Bearer ")) {
+                return this.onError(exchange, HttpStatus.UNAUTHORIZED);
             }
-            if (!exchange.getRequest().getHeaders().containsKey(HttpHeaders.AUTHORIZATION)) {
-                return this.onError(exchange, "Missing Authorization Header", HttpStatus.UNAUTHORIZED);
-            }
-            String auther = authHeader.get(0);
-            if (auther.startsWith("Bearer ")) {
-                auther = auther.substring(7);
-            }
+            String token = authorization.substring(7);
             try {
-                jwtService.validateToken(auther);
-                Claims claims = jwtService.getClaims(auther).getPayload();
+                Claims claims = jwtService.parseAccessToken(token);
+                String role = claims.get("role", String.class);
                 exchange = exchange.mutate()
-                        .request(r -> r.header("X-User-Id", claims.getSubject())
-                                .header("X-User-Roles", claims.get("roles", String.class)))
+                        .request(request -> request.headers(headers -> {
+                            headers.remove("X-User-Id");
+                            headers.remove("X-User-Roles");
+                            headers.set("X-User-Id", claims.getSubject());
+                            headers.set("X-User-Roles", role);
+                        }))
                         .build();
             } catch (Exception e) {
-                return this.onError(exchange, "Invalid or Expired API Token", HttpStatus.UNAUTHORIZED);
+                log.debug("Rejected invalid access token", e);
+                return this.onError(exchange, HttpStatus.UNAUTHORIZED);
             }
-            log.info("===================---12321312");
             return chain.filter(exchange);
         });
     }
-    private Mono onError(ServerWebExchange exchange, String err, HttpStatus httpStatus) {
+
+    private Mono<Void> onError(ServerWebExchange exchange, HttpStatus httpStatus) {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(httpStatus);
         return response.setComplete();

@@ -5,32 +5,23 @@ import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.example.commonsservice.constants.ErrorMessage;
 import org.example.commonsservice.exception.JwtAuthenticationException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.io.Decoders;
 
 import javax.crypto.SecretKey;
-import java.security.Key;
+import java.time.Duration;
 import java.util.Date;
 
-@Component
 @RequiredArgsConstructor
 public class JwtService {
+    private static final String TOKEN_TYPE_CLAIM = "token_type";
+    private static final String ACCESS_TOKEN = "ACCESS";
+    private static final String REFRESH_TOKEN = "REFRESH";
+
     private final JwtProperties jwtProperties;
-
-    @Value("${jwt.secret}")
-    private String secret;
-
-    @Value("${jwt.expiration}")
-    private Long expiration;
-
-    @Value("${jwt.re_expiration}")
-    private Long rf_expiration;
 
     /**
      *
@@ -40,7 +31,7 @@ public class JwtService {
      * @return
      */
     public String generateRefreshToken(Long userId, String username, String role) {
-        return buildToken(userId, username, role, rf_expiration);
+        return buildToken(userId, username, role, jwtProperties.getRefreshTokenExpiration(), REFRESH_TOKEN);
     }
 
     /**
@@ -51,7 +42,7 @@ public class JwtService {
      * @return
      */
     public String generateToken(Long userId, String username, String role) {
-        return buildToken(userId, username, role, expiration);
+        return buildToken(userId, username, role, jwtProperties.getAccessTokenExpiration(), ACCESS_TOKEN);
     }
 
     /**
@@ -59,12 +50,12 @@ public class JwtService {
      * @param userId
      * @param username
      * @param role
-     * @param expirationMs
+     * @param expiration
      * @return String
      */
-    public String buildToken(Long userId, String username, String role, Long expirationMs) {
+    private String buildToken(Long userId, String username, String role, Duration expiration, String tokenType) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + expirationMs);
+        Date expiry = new Date(now.getTime() + expiration.toMillis());
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .issuer(jwtProperties.getIssuer())
@@ -72,6 +63,7 @@ public class JwtService {
                 .expiration(expiry)
                 .claim("username", username)
                 .claim("role", role)
+                .claim(TOKEN_TYPE_CLAIM, tokenType)
                 .signWith(getSignKey())
                 .compact();
     }
@@ -82,9 +74,20 @@ public class JwtService {
      * @return
      */
     public boolean validateToken(final String token) {
+        parseAccessToken(token);
+        return true;
+    }
+
+    public Claims parseAccessToken(final String token) {
         try {
             Jws<Claims> claimsJws = getClaims(token);
-            return !claimsJws.getPayload().getExpiration().before(new Date());
+            Claims claims = claimsJws.getPayload();
+            if (claims.getExpiration().before(new Date())
+                    || !ACCESS_TOKEN.equals(claims.get(TOKEN_TYPE_CLAIM, String.class))
+                    || !jwtProperties.getIssuer().equals(claims.getIssuer())) {
+                throw new IllegalArgumentException("Invalid access token claims");
+            }
+            return claims;
         } catch (JwtException | IllegalArgumentException exception) {
             throw new JwtAuthenticationException(ErrorMessage.JWT_TOKEN_EXPIRED, HttpStatus.UNAUTHORIZED);
         }
@@ -105,8 +108,11 @@ public class JwtService {
      *
      * @return
      */
-    private Key getSignKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secret);
+    private SecretKey getSignKey() {
+        if (jwtProperties.getSecret() == null || jwtProperties.getSecret().isBlank()) {
+            throw new IllegalStateException("jwt.secret must be configured");
+        }
+        byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecret());
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }

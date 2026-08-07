@@ -1,9 +1,0 @@
-spring:
-  application:
-    name: commons-service
-
-jwt:
-  header: Authorization
-  secret: ANMGN10M0EI76QJPOOCAKRD1RJ98C6AACBIM8YYCJKMH43VTD52IRJE8N0DEOB70
-  expiration: 6048000
-  re_expiration: 60480000

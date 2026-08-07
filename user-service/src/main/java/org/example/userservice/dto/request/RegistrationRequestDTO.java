@@ -2,25 +2,25 @@ package org.example.userservice.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 
 @Data
 public class RegistrationRequestDTO {
     @NotBlank
+    @Size(max = 100)
     private String fullName;
 
     @NotBlank
+    @Size(min = 3, max = 50)
     private String username;
 
     @NotBlank
-    private String role;
-
-    @NotBlank
     @Email
+    @Size(max = 254)
     private String email;
 
     @NotBlank
+    @Size(min = 8, max = 72)
     private String password;
 }

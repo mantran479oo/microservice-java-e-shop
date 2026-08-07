@@ -4,18 +4,18 @@ spring:
   application:
     name: user-service
   datasource:
-    # Dùng cú pháp ${TÊN_BIẾN:giá_trị_mặc_định}
-    url: jdbc:mysql://${DATASOURCE_HOST}:${DATASOURCE_PORT}/demo?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: ${DATASOURCE_USERNAME:root}
-    password: ${DATASOURCE_PASSWORD:root}
+    url: jdbc:mysql://${DATASOURCE_HOST}:${DATASOURCE_PORT}/${DATASOURCE_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DATASOURCE_USERNAME}
+    password: ${DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
 eureka:
   client:
     service-url:
-      defaultZone: http://${EUREKA_HOST:localhost}:8761/eureka
+      defaultZone: ${EUREKA_URL}
     fetch-registry: true
     register-with-eureka: true
   instance:

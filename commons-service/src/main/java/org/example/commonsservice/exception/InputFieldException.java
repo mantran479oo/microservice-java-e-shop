@@ -2,14 +2,12 @@ package org.example.commonsservice.exception;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindingResult;
 
 import java.util.HashMap;
 import java.util.Map;
 
-@Slf4j
 @Getter
 @AllArgsConstructor
 public class InputFieldException extends RuntimeException {

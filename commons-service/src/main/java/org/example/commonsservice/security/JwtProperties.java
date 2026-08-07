@@ -3,16 +3,15 @@ package org.example.commonsservice.security;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 
-@Configuration
+import java.time.Duration;
+
 @ConfigurationProperties(prefix = "jwt")
 @Getter
 @Setter
 public class JwtProperties {
     private String secret;
-
-    private Long expiration;
-
-    private String issuer;
+    private String issuer = "project-javajava";
+    private Duration accessTokenExpiration = Duration.ofMinutes(15);
+    private Duration refreshTokenExpiration = Duration.ofDays(7);
 }
